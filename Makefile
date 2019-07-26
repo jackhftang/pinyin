@@ -1,3 +1,5 @@
+all: apk
+
 flutter:
 	flutter run
 
