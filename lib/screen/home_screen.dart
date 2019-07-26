@@ -33,9 +33,9 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   TextEditingController controller = TextEditingController();
   List<Word> words = [];
-  List<List<Word>> history = [];
+  List<List<Word>> history;
 
-  _read() async {
+  Future<List<List<Word>>> _read() async {
     var dictionary = Dictionary.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
@@ -52,9 +52,11 @@ class HomeScreenState extends State<HomeScreen> {
         }
         history.add(phrase);
       }
+      return history;
     } catch (e) {
       print("Couldn't read file $e");
     }
+    return [];
   }
 
   _save() async {
@@ -86,11 +88,6 @@ class HomeScreenState extends State<HomeScreen> {
         }
       });
     });
-
-    // read history from file
-    _read().then((_) {
-      setState(() {});
-    });
   }
 
   save() {
@@ -109,42 +106,49 @@ class HomeScreenState extends State<HomeScreen> {
 
   Widget buildWords(BuildContext context, List<Word> words) {
     return Row(
-        children: words.map((word) {
+        children: words.map((Word word) {
       return Container(
-          padding: EdgeInsets.all(5.0),
-          child: GestureDetector(
-              child: Column(
-                children: <Widget>[
-                  Text(word.pinyin, textAlign: TextAlign.left),
-                  Text(word.text, textAlign: TextAlign.left),
-                ],
-              ),
-              onTap: () async {
-                if (word.pinyins.length == 1) {
-                  final snackBar = SnackBar(content: Text('${word.text} 并無其他拼音'), duration: Duration(seconds: 1));
-                  Scaffold.of(context).showSnackBar(snackBar);
-                } else {
-                  int i = await showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return SimpleDialog(
-                            title: Text('選擇拼音', textAlign: TextAlign.center),
-                            children: List.generate(word.pinyins.length, (int i) {
-                              var w = word.pinyins[i];
-                              return SimpleDialogOption(
-                                child: Text(w),
-                                onPressed: () {
-                                  Navigator.pop(context, i);
-                                },
-                              );
-                            }));
-                      });
-                  setState(() {
-                    word.index = i;
-                    _save();
+        padding: EdgeInsets.all(5.0),
+        child: GestureDetector(
+          child: Column(
+            children: <Widget>[
+              Text(word.pinyin, textAlign: TextAlign.left),
+              Text(word.text, textAlign: TextAlign.left),
+            ],
+          ),
+          onTap: () async {
+            if (word.pinyins.length == 1) {
+              final snackBar = SnackBar(
+                content: Text('${word.text} 並無其他拼音'),
+                duration: Duration(seconds: 1),
+              );
+              Scaffold.of(context).showSnackBar(snackBar);
+            } else {
+              var i = await showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return SimpleDialog(
+                        title: Text('選擇拼音(${word.text})', textAlign: TextAlign.center),
+                        children: List.generate(word.pinyins.length, (int i) {
+                          var w = word.pinyins[i];
+                          return SimpleDialogOption(
+                            child: Text(w),
+                            onPressed: () {
+                              Navigator.pop(context, i);
+                            },
+                          );
+                        }));
                   });
-                }
-              }));
+              if (i is int) {
+                setState(() {
+                  word.index = i;
+                  _save();
+                });
+              }
+            }
+          },
+        ),
+      );
     }).toList());
   }
 
@@ -171,29 +175,45 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: <Widget>[
-          Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.0),
-              child: Row(children: [
-                Expanded(child: TextField(controller: controller)),
-                FlatButton(
-                  child: Text('save'),
-                  color: Colors.blue,
-                  textColor: Colors.white,
-                  onPressed: save,
-                )
-              ])),
-          buildWords(context, words),
-          Divider(),
-          Expanded(child: buildHistory(context)),
-        ],
-      ),
+    return FutureBuilder(
+      future: () async {
+        if (history == null) history = await _read();
+        return true;
+      }(),
+      builder: (BuildContext context, AsyncSnapshot snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text("Error: ${snapshot.error}"));
+        }
+
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(widget.title),
+          ),
+          body: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.0),
+                  child: Row(children: [
+                    Expanded(child: TextField(controller: controller)),
+                    FlatButton(
+                      child: Text('save'),
+                      color: Colors.blue,
+                      textColor: Colors.white,
+                      onPressed: save,
+                    )
+                  ])),
+              buildWords(context, words),
+              Divider(),
+              Expanded(child: buildHistory(context)),
+            ],
+          ),
+        );
+      },
     );
   }
 }

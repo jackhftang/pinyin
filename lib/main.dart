@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: HomeScreen(title: '拼音字典'),
+      home: Scaffold(body: HomeScreen(title: '拼音字典')),
     );
   }
 }
